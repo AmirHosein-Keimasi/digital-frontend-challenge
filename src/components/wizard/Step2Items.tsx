@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, ArrowRight, Plus, ShieldAlert, Trash2 } from "lucide-react";
@@ -33,15 +33,15 @@ export function Step2Items() {
   const { formData, updateStep2, goToStep } = useWizard();
   const isEmergency = formData.inspectionType === "emergency";
 
-  // ساخت پویای اسکیما: الزامی شدن مخاطب ارجاع تنها در شرایط بازرسی اضطراری
+  // اسکیما: در شرایط اضطراری فیلد مخاطب الزامی می‌شود
   const schema = useMemo(() => {
     return isEmergency
       ? step2Schema.extend({
-          escalationContact: z
-            .string()
-            .trim()
-            .min(3, "برای بازرسی اضطراری، مخاطب ارجاع الزامی است (حداقل ۳ کاراکتر)."),
-        })
+        escalationContact: z
+          .string()
+          .trim()
+          .min(3, "برای بازرسی اضطراری، مخاطب ارجاع الزامی است (حداقل ۳ کاراکتر)."),
+      })
       : step2Schema;
   }, [isEmergency]);
 
@@ -50,7 +50,7 @@ export function Step2Items() {
     register,
     control,
     handleSubmit,
-    getValues,
+    watch,
     formState: { errors },
   } = useForm<Step2FormValues>({
     resolver: zodResolver(schema),
@@ -66,17 +66,18 @@ export function Step2Items() {
     name: "items",
   });
 
-  // ذخیره ورودی‌های فعلی کاربر در کانتکست پیش از بازگشت به مرحله ۱
-  function handleBack() {
-    const current = getValues();
-    updateStep2({
-      escalationContact: isEmergency ? current.escalationContact : undefined,
-      items: current.items,
+  // همگام‌سازی لحظه‌ای تغییرات فرم با کانتکست (حذف، افزودن، تایپ)
+  useEffect(() => {
+    const subscription = watch((values) => {
+      updateStep2({
+        escalationContact: isEmergency ? values.escalationContact : undefined,
+        items: (values.items as FindingItem[]) ?? [],
+      });
     });
-    goToStep(1);
-  }
+    return () => subscription.unsubscribe();
+  }, [watch, updateStep2, isEmergency]);
 
-  // ثبت داده‌های تأییدشده در کانتکست و رفتن به مرحله مرور (مرحله ۳)
+  // ثبت نهایی داده‌ها و رفتن به مرحله مرور
   function onSubmit(data: Step2FormValues) {
     updateStep2({
       escalationContact: isEmergency ? data.escalationContact?.trim() : undefined,
@@ -109,8 +110,8 @@ export function Step2Items() {
         </CardHeader>
 
         <CardContent className="space-y-5">
-          {/* نمایش مشروط مخاطب ارجاع در بازرسی‌های اضطراری */}
-          {isEmergency ? (
+          {/* نمایش مخاطب ارجاع فقط در بازرسی‌های اضطراری */}
+          {isEmergency && (
             <div className="space-y-4">
               <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                 <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -126,10 +127,10 @@ export function Step2Items() {
                 {...register("escalationContact")}
               />
             </div>
-          ) : null}
+          )}
 
-          {/* نمایش حالت خالی در صورت نبود یافته */}
-          {fields.length === 0 ? (
+          {/* حالت خالی: وقتی هنوز یافته‌ای اضافه نشده */}
+          {fields.length === 0 && (
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/60 px-6 py-10 text-center">
               <span className="mx-auto flex size-10 items-center justify-center rounded-full bg-white text-slate-400 ring-1 ring-slate-200">
                 <Plus className="size-5" aria-hidden="true" />
@@ -149,7 +150,10 @@ export function Step2Items() {
                 افزودن یافته
               </Button>
             </div>
-          ) : (
+          )}
+
+          {/* لیست یافته‌ها */}
+          {fields.length > 0 && (
             <div className="space-y-4">
               {/* پیمایش روی ردیف‌های پویا با کلید پایدار field.id */}
               {fields.map((field, index) => {
@@ -230,12 +234,12 @@ export function Step2Items() {
             </div>
           )}
 
-          {/* خطای اعتبارسنجی حداقل تعداد یافته‌ها */}
-          {itemsError ? (
+          {/* خطای شرط حداقل یک یافته */}
+          {itemsError && (
             <p className="text-sm font-medium text-red-600" role="alert">
               {itemsError}
             </p>
-          ) : null}
+          )}
 
           <p className="text-xs text-slate-500">
             {toPersianDigits(fields.length)} یافته در پیش‌نویس فعلی.
@@ -247,7 +251,7 @@ export function Step2Items() {
           <Button
             type="button"
             variant="secondary"
-            onClick={handleBack}
+            onClick={() => goToStep(1)}
             startIcon={<ArrowRight className="size-4" aria-hidden="true" />}
           >
             بازگشت
