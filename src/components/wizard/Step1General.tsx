@@ -20,14 +20,14 @@ import { useWizard } from "./WizardContext";
 
 export function Step1General() {
   const { formData, updateStep1, goToStep } = useWizard();
+  const [errors, setErrors] = useState<FieldErrors>({});
 
-  // از پیش‌نویس مقداردهی می‌شود تا بازگشت از مرحله ۲ ورودی کاربر را از بین نبرد.
-  const [values, setValues] = useState<Step1Data>({
+  // استیت فرم مستقیماً از Context (منبع واحد حقیقت) مشتق می‌شود
+  const values: Step1Data = {
     siteName: formData.siteName ?? "",
     inspectorEmail: formData.inspectorEmail ?? "",
     inspectionType: formData.inspectionType ?? "routine",
-  });
-  const [errors, setErrors] = useState<FieldErrors>({});
+  };
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,9 +64,10 @@ export function Step1General() {
             hint="نامی را وارد کنید که روی تابلو یا قرارداد سایت درج شده است."
             value={values.siteName}
             error={errors.siteName?.[0]}
-            onChange={(event) =>
-              setValues((previous) => ({ ...previous, siteName: event.target.value }))
-            }
+            onChange={(event) => {
+              updateStep1({ siteName: event.target.value });
+              setErrors((previous) => ({ ...previous, siteName: undefined }));
+            }}
           />
 
           <Input
@@ -79,9 +80,10 @@ export function Step1General() {
             placeholder="inspector@company.com"
             value={values.inspectorEmail}
             error={errors.inspectorEmail?.[0]}
-            onChange={(event) =>
-              setValues((previous) => ({ ...previous, inspectorEmail: event.target.value }))
-            }
+            onChange={(event) => {
+              updateStep1({ inspectorEmail: event.target.value });
+              setErrors((previous) => ({ ...previous, inspectorEmail: undefined }));
+            }}
           />
 
           <Select
@@ -90,12 +92,12 @@ export function Step1General() {
             required
             value={values.inspectionType}
             error={errors.inspectionType?.[0]}
-            onChange={(event) =>
-              setValues((previous) => ({
-                ...previous,
+            onChange={(event) => {
+              updateStep1({
                 inspectionType: event.target.value as Step1Data["inspectionType"],
-              }))
-            }
+              });
+              setErrors((previous) => ({ ...previous, inspectionType: undefined }));
+            }}
           >
             {Object.entries(inspectionTypeLabels).map(([value, label]) => (
               <option key={value} value={value}>

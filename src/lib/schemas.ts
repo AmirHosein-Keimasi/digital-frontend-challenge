@@ -48,6 +48,21 @@ export const fullReportSchema = step1Schema.extend(step2Schema.shape).superRefin
   }
 });
 
+/** اسکیما برای ذخیره و بازیابی پیش‌نویس (پشتیبانی از داده‌های ناقص در حین تایپ). */
+export const draftSchema = step1Schema.partial().extend({
+  escalationContact: z.string().optional(),
+  items: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        severity: z.enum(severityValues),
+        notes: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
 export type Step1Data = z.infer<typeof step1Schema>;
 export type FindingItem = z.infer<typeof findingItemSchema>;
 export type Step2Data = z.infer<typeof step2Schema>;

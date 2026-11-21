@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, ArrowRight, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { z } from "zod";
@@ -37,11 +37,11 @@ export function Step2Items() {
   const schema = useMemo(() => {
     return isEmergency
       ? step2Schema.extend({
-        escalationContact: z
-          .string()
-          .trim()
-          .min(3, "برای بازرسی اضطراری، مخاطب ارجاع الزامی است (حداقل ۳ کاراکتر)."),
-      })
+          escalationContact: z
+            .string()
+            .trim()
+            .min(3, "برای بازرسی اضطراری، مخاطب ارجاع الزامی است (حداقل ۳ کاراکتر)."),
+        })
       : step2Schema;
   }, [isEmergency]);
 
@@ -50,7 +50,6 @@ export function Step2Items() {
     register,
     control,
     handleSubmit,
-    watch,
     formState: { errors },
   } = useForm<Step2FormValues>({
     resolver: zodResolver(schema),
@@ -66,16 +65,17 @@ export function Step2Items() {
     name: "items",
   });
 
-  // همگام‌سازی لحظه‌ای تغییرات فرم با کانتکست (حذف، افزودن، تایپ)
+  // همگام‌سازی لحظه‌ای مقادیر فرم با کانتکست (حذف، افزودن، تایپ)
+  const watchedValues = useWatch({ control });
+
   useEffect(() => {
-    const subscription = watch((values) => {
+    if (watchedValues) {
       updateStep2({
-        escalationContact: isEmergency ? values.escalationContact : undefined,
-        items: (values.items as FindingItem[]) ?? [],
+        escalationContact: isEmergency ? watchedValues.escalationContact : undefined,
+        items: (watchedValues.items as FindingItem[]) ?? [],
       });
-    });
-    return () => subscription.unsubscribe();
-  }, [watch, updateStep2, isEmergency]);
+    }
+  }, [watchedValues, updateStep2, isEmergency]);
 
   // ثبت نهایی داده‌ها و رفتن به مرحله مرور
   function onSubmit(data: Step2FormValues) {

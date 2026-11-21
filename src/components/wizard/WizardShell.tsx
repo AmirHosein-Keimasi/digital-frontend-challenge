@@ -1,7 +1,8 @@
 "use client";
 
-import { Check, ClipboardCheck } from "lucide-react";
+import { Check, ClipboardCheck, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { toPersianDigits } from "@/lib/format";
 import { Step1General } from "./Step1General";
@@ -16,7 +17,7 @@ const steps: ReadonlyArray<{ id: WizardStep; title: string; description: string 
 ];
 
 export function WizardShell() {
-  const { currentStep, goToStep } = useWizard();
+  const { currentStep, goToStep, resetWizard, hasDraft, isHydrated } = useWizard();
 
   return (
     <div className="min-h-dvh">
@@ -31,7 +32,23 @@ export function WizardShell() {
               <p className="text-xs text-slate-500">ویزارد گزارش</p>
             </div>
           </div>
-          <Badge>پیش‌نویس</Badge>
+
+          <div className="flex items-center gap-2">
+            {/* دکمه پاک کردن پیش‌نویس فقط زمانی که پیش‌نویسی وجود داشته باشد */}
+            {hasDraft && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={resetWizard}
+                className="text-xs text-slate-500 hover:text-red-600"
+                startIcon={<RotateCcw className="size-3.5" aria-hidden="true" />}
+              >
+                پاک کردن پیش‌نویس
+              </Button>
+            )}
+            <Badge>پیش‌نویس</Badge>
+          </div>
         </div>
       </header>
 
@@ -98,9 +115,17 @@ export function WizardShell() {
           </ol>
         </nav>
 
-        {currentStep === 1 ? <Step1General /> : null}
-        {currentStep === 2 ? <Step2Items /> : null}
-        {currentStep === 3 ? <Step3Review /> : null}
+        {!isHydrated ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">
+            در حال بارگذاری پیش‌نویس...
+          </div>
+        ) : (
+          <>
+            {currentStep === 1 && <Step1General />}
+            {currentStep === 2 && <Step2Items />}
+            {currentStep === 3 && <Step3Review />}
+          </>
+        )}
 
         <p className="mt-6 text-center text-xs text-slate-400">
           گزارش فقط در مرحله پایانی و پس از تأیید شما ارسال می‌شود.

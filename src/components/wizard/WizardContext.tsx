@@ -1,20 +1,32 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import type { FullReportData, Step1Data, Step2Data } from "@/lib/schemas";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { draftSchema, type FullReportData, type Step1Data, type Step2Data } from "@/lib/schemas";
 
 export type WizardStep = 1 | 2 | 3;
+
+const STORAGE_KEY = "site_inspection_draft_v1";
 
 export interface WizardContextValue {
   currentStep: WizardStep;
   formData: Partial<FullReportData>;
-  /** داده معتبر مرحله ۱ را به پیش‌نویس اضافه می‌کند. */
-  updateStep1: (data: Step1Data) => void;
-  /** داده معتبر مرحله ۲ را به پیش‌نویس اضافه می‌کند. */
+  isHydrated: boolean;
+  hasDraft: boolean;
+  /** داده‌های مرحله ۱ را در پیش‌نویس ذخیره می‌کند. */
+  updateStep1: (data: Partial<Step1Data>) => void;
+  /** داده‌های مرحله ۲ را در پیش‌نویس ذخیره می‌کند. */
   updateStep2: (data: Step2Data) => void;
   /** رفتن به مرحله مشخص. */
   goToStep: (step: WizardStep) => void;
-  /** پاک کردن پیش‌نویس از حافظه. */
+  /** پاک کردن کامل پیش‌نویس از حافظه رم و استوریج. */
   resetWizard: () => void;
 }
 
@@ -23,11 +35,65 @@ const WizardContext = createContext<WizardContextValue | null>(null);
 export function WizardProvider({ children }: { children: ReactNode }) {
   const [currentStep, setCurrentStep] = useState<WizardStep>(1);
   const [formData, setFormData] = useState<Partial<FullReportData>>({});
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  // TODO (Task 2): پیش‌نویس را در localStorage نگه دارید و بعد از mount بازیابی کنید.
-  // جزئیات و شرایط خطا در README، بخش «Task 2» آمده است.
+  // بازیابی پیش‌نویس از localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
 
-  const updateStep1 = useCallback((data: Step1Data) => {
+        if (
+          parsed &&
+          typeof parsed === "object" &&
+          !Array.isArray(parsed) &&
+          parsed.formData &&
+          typeof parsed.formData === "object" &&
+          !Array.isArray(parsed.formData)
+        ) {
+          const result = draftSchema.safeParse(parsed.formData);
+          if (result.success) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setFormData(result.data);
+
+            if ([1, 2, 3].includes(parsed.currentStep)) {
+              setCurrentStep(parsed.currentStep as WizardStep);
+            }
+          } else {
+            localStorage.removeItem(STORAGE_KEY);
+          }
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+    } catch {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // Storage is unavailable
+      }
+    } finally {
+      setIsHydrated(true);
+    }
+  }, []);
+
+  // ذخیره‌سازی خودکار در localStorage پس از هیدریشن کلاینت
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    try {
+      if (Object.keys(formData).length === 0) {
+        localStorage.removeItem(STORAGE_KEY);
+      } else {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ formData, currentStep }));
+      }
+    } catch {
+      // در صورت خطای Storage کار در حافظه رم ادامه می‌یابد
+    }
+  }, [formData, currentStep, isHydrated]);
+
+  const updateStep1 = useCallback((data: Partial<Step1Data>) => {
     setFormData((previous) => ({ ...previous, ...data }));
   }, []);
 
@@ -42,23 +108,31 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     // جزئیات در README، بخش «Task 3».
   }, []);
 
-  // TODO (Task 2): ورودی localStorage را هم پاک کنید و یک دکمه «پاک کردن پیش‌نویس»
-  // در <WizardShell /> اضافه کنید.
   const resetWizard = useCallback(() => {
     setFormData({});
     setCurrentStep(1);
+
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Storage is unavailable
+    }
   }, []);
+
+  const hasDraft = Object.keys(formData).length > 0;
 
   const value = useMemo<WizardContextValue>(
     () => ({
       currentStep,
       formData,
+      isHydrated,
+      hasDraft,
       updateStep1,
       updateStep2,
       goToStep,
       resetWizard,
     }),
-    [currentStep, formData, updateStep1, updateStep2, goToStep, resetWizard],
+    [currentStep, formData, isHydrated, hasDraft, updateStep1, updateStep2, goToStep, resetWizard],
   );
 
   return <WizardContext.Provider value={value}>{children}</WizardContext.Provider>;
