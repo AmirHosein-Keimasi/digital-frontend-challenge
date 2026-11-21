@@ -17,7 +17,8 @@ const steps: ReadonlyArray<{ id: WizardStep; title: string; description: string 
 ];
 
 export function WizardShell() {
-  const { currentStep, goToStep, resetWizard, hasDraft, isHydrated } = useWizard();
+  const { currentStep, goToStep, isStepAccessible, resetWizard, hasDraft, isHydrated } =
+    useWizard();
 
   return (
     <div className="min-h-dvh">
@@ -58,20 +59,23 @@ export function WizardShell() {
             {steps.map((step) => {
               const isActive = step.id === currentStep;
               const isComplete = currentStep > step.id;
+              const isAccessible = isStepAccessible(step.id);
 
               return (
                 <li key={step.id}>
-                  {/*
-                    TODO (Task 3): برای مراحل غیرفعال aria-disabled بگذارید و پرش به جلو را
-                    وقتی مرحله قبلی معتبر نیست مسدود کنید. جزئیات در README.
-                  */}
                   <button
                     type="button"
                     onClick={() => goToStep(step.id)}
+                    disabled={!isAccessible}
+                    aria-disabled={!isAccessible ? "true" : undefined}
                     aria-current={isActive ? "step" : undefined}
                     className={cn(
                       "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors sm:gap-3 sm:px-3",
-                      isActive ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100",
+                      isActive
+                        ? "bg-slate-900 text-white"
+                        : isAccessible
+                          ? "text-slate-600 hover:bg-slate-100"
+                          : "cursor-not-allowed text-slate-400 opacity-40",
                     )}
                   >
                     <span
@@ -81,7 +85,9 @@ export function WizardShell() {
                           ? "border-white/30 bg-white/10 text-white"
                           : isComplete
                             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-slate-300 bg-white text-slate-500",
+                            : isAccessible
+                              ? "border-slate-300 bg-white text-slate-500"
+                              : "border-slate-200 bg-slate-100 text-slate-400",
                       )}
                     >
                       {isComplete ? (
@@ -94,7 +100,11 @@ export function WizardShell() {
                       <span
                         className={cn(
                           "block truncate text-xs font-medium sm:text-sm",
-                          isActive ? "text-white" : "text-slate-900",
+                          isActive
+                            ? "text-white"
+                            : isAccessible
+                              ? "text-slate-900"
+                              : "text-slate-400",
                         )}
                       >
                         {step.title}
@@ -102,7 +112,11 @@ export function WizardShell() {
                       <span
                         className={cn(
                           "hidden truncate text-xs sm:block",
-                          isActive ? "text-slate-300" : "text-slate-500",
+                          isActive
+                            ? "text-slate-300"
+                            : isAccessible
+                              ? "text-slate-500"
+                              : "text-slate-400",
                         )}
                       >
                         {step.description}

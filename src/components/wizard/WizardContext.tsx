@@ -9,7 +9,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { draftSchema, type FullReportData, type Step1Data, type Step2Data } from "@/lib/schemas";
+import {
+  draftSchema,
+  fullReportSchema,
+  step1Schema,
+  type FullReportData,
+  type Step1Data,
+  type Step2Data,
+} from "@/lib/schemas";
 
 export type WizardStep = 1 | 2 | 3;
 
@@ -26,6 +33,8 @@ export interface WizardContextValue {
   updateStep2: (data: Step2Data) => void;
   /** رفتن به مرحله مشخص. */
   goToStep: (step: WizardStep) => void;
+  /** بررسی امکان دسترسی به مرحله مشخص بر اساس گارد ناوبری. */
+  isStepAccessible: (step: WizardStep) => boolean;
   /** پاک کردن کامل پیش‌نویس از حافظه رم و استوریج. */
   resetWizard: () => void;
 }
@@ -101,12 +110,35 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     setFormData((previous) => ({ ...previous, ...data }));
   }, []);
 
-  const goToStep = useCallback((step: WizardStep) => {
-    setCurrentStep(step);
+  // گارد ناوبری: بررسی دسترسی به هر مرحله بر اساس اعتبار مراحل قبلی (تسک ۳)
+  const isStepAccessible = useCallback(
+    (step: WizardStep): boolean => {
+      // کاربر آزاد است روی هدر مرحله قبلی کلیک کرده و به عقب برگردد
+      if (step <= currentStep) return true;
 
-    // TODO (Task 3): پرش به جلو را وقتی مراحل قبلی معتبر نیستند مسدود کنید.
-    // جزئیات در README، بخش «Task 3».
-  }, []);
+      // پرش به جلو در صورتی که مرحله قبلی نامعتبر است باید مسدود باشد
+      if (step === 2) {
+        return step1Schema.safeParse(formData).success;
+      }
+
+      if (step === 3) {
+        return fullReportSchema.safeParse(formData).success;
+      }
+
+      return false;
+    },
+    [currentStep, formData],
+  );
+
+  const goToStep = useCallback(
+    (step: WizardStep) => {
+      // مسدودسازی پرش مستقیم به جلو وقتی مرحله قبلی نامعتبر است
+      if (isStepAccessible(step)) {
+        setCurrentStep(step);
+      }
+    },
+    [isStepAccessible],
+  );
 
   const resetWizard = useCallback(() => {
     setFormData({});
@@ -130,9 +162,20 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       updateStep1,
       updateStep2,
       goToStep,
+      isStepAccessible,
       resetWizard,
     }),
-    [currentStep, formData, isHydrated, hasDraft, updateStep1, updateStep2, goToStep, resetWizard],
+    [
+      currentStep,
+      formData,
+      isHydrated,
+      hasDraft,
+      updateStep1,
+      updateStep2,
+      goToStep,
+      isStepAccessible,
+      resetWizard,
+    ],
   );
 
   return <WizardContext.Provider value={value}>{children}</WizardContext.Provider>;
